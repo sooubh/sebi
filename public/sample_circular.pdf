@@ -1,0 +1,109 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 6 0 R >> >> /Contents 7 0 R >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 6 0 R >> >> /Contents 8 0 R >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 6 0 R >> >> /Contents 9 0 R >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+7 0 obj
+<< /Length 450 >>
+stream
+BT
+/F1 18 Tf
+50 780 Td
+(SEBI Circular: Cybersecurity Resilience Framework) Tj
+/F1 12 Tf
+0 -30 Td
+(Circular No: SEBI/HO/MIRSD/CIR/P/2026/123) Tj
+0 -20 Td
+(Date: June 29, 2026) Tj
+0 -40 Td
+(1. Background and Purpose) Tj
+0 -20 Td
+(In view of the increasing cyber threats, SEBI hereby mandates that all registered) Tj
+0 -15 Td
+(stock brokers must implement a Cyber Security Resilience Framework (CRF).) Tj
+0 -30 Td
+(2. Existing Systems Alignment (Compliant Baseline)) Tj
+0 -20 Td
+(Brokers who have already implemented ISO 27001 standard certification shall) Tj
+0 -15 Td
+(be deemed compliant with Chapter II of this framework, provided audit reports) Tj
+0 -15 Td
+(are submitted annually.) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Length 450 >>
+stream
+BT
+/F1 14 Tf
+50 780 Td
+(3. Modified Requirements (Changed Language)) Tj
+/F1 12 Tf
+0 -30 Td
+(Under the previous guidelines, the Reporting Incident window was 24 hours.) Tj
+0 -20 Td
+(As per the revised framework, all cyber incidents MUST be reported within) Tj
+0 -15 Td
+(6 hours of detection to the MIRSD department and CERT-In.) Tj
+0 -40 Td
+(4. New Obligations (High Risk / Mandatory Compliance)) Tj
+0 -20 Td
+(Registered stock brokers must establish a dedicated Cyber Security Committee) Tj
+0 -15 Td
+(headed by a Chief Information Security Officer (CISO). The committee must meet) Tj
+0 -15 Td
+(at least once every quarter and submit minutes to the Board.) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Length 450 >>
+stream
+BT
+/F1 14 Tf
+50 780 Td
+(5. Evidence and Proof-Related Texts) Tj
+/F1 12 Tf
+0 -30 Td
+(To prove compliance, stock brokers must upload their Quarterly Audit Report,) Tj
+0 -20 Td
+(the CISO Appointment Letter, and CERT-In registration proof. All documents) Tj
+0 -15 Td
+(must be signed by the Compliance Officer and uploaded to the SEBI portal.) Tj
+0 -45 Td
+(End of Circular. All requirements are effective from August 1, 2026.) Tj
+ET
+endstream
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000122 00000 n 
+0000000234 00000 n 
+0000000346 00000 n 
+0000000458 00000 n 
+0000000523 00000 n 
+0000001030 00000 n 
+0000001537 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+2094
+%%EOF
