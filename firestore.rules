@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // SOUBH Securities Pvt. Ltd. (fictional baseline data)
+    // Seeding and read access rules
+    match /companies/{companyId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.companyId == companyId;
+    }
+    
+    match /companies/{companyId}/baseline/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.companyId == companyId;
+    }
+
+    match /circulars/{document=**} {
+      allow read, write: if true; // Open read/write for MVP testing and demo flows
+    }
+
+    match /workflowRuns/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /documents/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /summaries/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /obligations/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /gapAnalysis/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /tasks/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /evidence/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /chatThreads/{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
