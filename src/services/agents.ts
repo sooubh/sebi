@@ -4,7 +4,7 @@ const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 // Common Gemini caller
 async function callGemini(
-  model: 'gemini-1.5-flash' | 'gemini-1.5-pro',
+  model: 'gemini-2.5-flash',
   systemInstruction: string,
   prompt: string
 ): Promise<any> {
@@ -136,7 +136,7 @@ ${pdfText}
 ---
 `;
 
-  return await callGemini('gemini-1.5-flash', systemInstruction, prompt);
+  return await callGemini('gemini-2.5-flash', systemInstruction, prompt);
 }
 
 // ==========================================
@@ -233,7 +233,7 @@ Company Context (If available):
 ${companyProfile ? JSON.stringify(companyProfile, null, 2) : 'Mid-sized retail stock broker.'}
 `;
 
-  return await callGemini('gemini-1.5-pro', systemInstruction, prompt);
+  return await callGemini('gemini-2.5-flash', systemInstruction, prompt);
 }
 
 // ==========================================
@@ -344,7 +344,7 @@ Company Baseline Policies:
 ${JSON.stringify(baseline.activePolicies, null, 2)}
 `;
 
-  return await callGemini('gemini-1.5-pro', systemInstruction, prompt);
+  return await callGemini('gemini-2.5-flash', systemInstruction, prompt);
 }
 
 // ==========================================
@@ -432,5 +432,5 @@ Company Departments:
 ${JSON.stringify(departments)}
 `;
 
-  return await callGemini('gemini-1.5-flash', systemInstruction, prompt);
+  return await callGemini('gemini-2.5-flash', systemInstruction, prompt);
 }

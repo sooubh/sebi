@@ -192,7 +192,7 @@ ${question}
 `;
 
     // 5. Query Gemini
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
     
     const payload = {
       contents: [
