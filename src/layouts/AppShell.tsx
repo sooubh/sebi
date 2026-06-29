@@ -11,9 +11,12 @@ import {
   ChevronDown, 
   UserCircle2, 
   Bell, 
-  AlertCircle 
+  AlertCircle,
+  Database,
+  Sparkles
 } from 'lucide-react';
 import { useRoleStore, UserRole } from '../context/useRoleStore';
+import { seedDatabase } from '../utils/seedDatabase';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -22,6 +25,19 @@ interface AppShellProps {
 export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();
   const { role, setRole } = useRoleStore();
+  const [isSeeding, setIsSeeding] = React.useState(false);
+
+  const handleSeed = async () => {
+    setIsSeeding(true);
+    try {
+      const res = await seedDatabase();
+      alert(res.message);
+    } catch (err: any) {
+      alert('Seeding failed: ' + err.message);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -156,6 +172,17 @@ export default function AppShell({ children }: AppShellProps) {
                 ))}
               </div>
             </div>
+
+            {/* Seed baseline database */}
+            <button 
+              onClick={handleSeed}
+              disabled={isSeeding}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 disabled:opacity-50 border border-indigo-200 text-xs font-bold rounded-xl transition-all duration-150"
+              title="Reset Demo Database"
+            >
+              <Database className="h-3.5 w-3.5" />
+              <span>{isSeeding ? 'Seeding...' : 'Seed Baseline'}</span>
+            </button>
 
             {/* Notifications */}
             <button className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors relative">
