@@ -20,8 +20,8 @@ import { useCircularStore } from '../../context/useCircularStore';
 import { usePDFViewer, PDFHighlight } from '../../components/pdf/PDFViewerContext';
 import { PDFViewer } from '../../components/pdf/PDFViewer';
 import { db } from '../../config/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { GapAnalysis, Obligation, SummaryData, ChatMessage } from '../../types';
+import { doc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
+import { GapAnalysis, Obligation, SummaryData, ChatMessage, CompanyBaseline, Department } from '../../types';
 import { askRiceChatbot } from '../../services/chatbot';
 
 interface Message {
@@ -38,7 +38,7 @@ interface Message {
 export default function Workspace() {
   const navigate = useNavigate();
   const { circulars, activeCircularId } = useCircularStore();
-  const { setPdfUrl, setHighlights, activeHighlightId, scrollToHighlight } = usePDFViewer();
+  const { setPdfUrl, setHighlights, activeHighlightId, scrollToHighlight, highlights } = usePDFViewer();
   const [activeTab, setActiveTab] = useState<'summary' | 'obligations' | 'chat'>('summary');
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<Message[]>([
@@ -50,6 +50,9 @@ export default function Workspace() {
   const [gapData, setGapData] = useState<GapAnalysis | null>(null);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [baselineData, setBaselineData] = useState<CompanyBaseline | null>(null);
+  const [draftingStates, setDraftingStates] = useState<Record<string, boolean>>({});
+  const [draftTexts, setDraftTexts] = useState<Record<string, string>>({});
 
   const currentCircularId = activeCircularId || 'circ-sebi-cyber';
   const circular = (circulars.find((c) => c.id === currentCircularId) || circulars[0]) as any;
@@ -88,6 +91,23 @@ export default function Workspace() {
       unsubSummary();
     };
   }, [currentCircularId]);
+
+  // Subscribe to real-time baseline data
+  useEffect(() => {
+    const unsubBaseline = onSnapshot(doc(db, 'companies/soubh-securities/baseline/current'), (snap) => {
+      if (snap.exists()) {
+        setBaselineData(snap.data() as CompanyBaseline);
+      } else {
+        setBaselineData(null);
+      }
+    }, (err) => {
+      console.error('Error fetching baseline in real-time:', err);
+    });
+
+    return () => {
+      unsubBaseline();
+    };
+  }, []);
 
   // Map gap analysis items to PDF highlights and sync with PDF Context
   useEffect(() => {
@@ -166,9 +186,24 @@ export default function Workspace() {
   // Sync active highlight from the PDF selection back to active tab & selected card
   useEffect(() => {
     if (activeHighlightId) {
-      setActiveTab('obligations');
+      if (activeTab !== 'obligations') {
+        setActiveTab('obligations');
+      }
+      
+      const scrollCard = () => {
+        const cardEl = document.getElementById(`obligation-card-${activeHighlightId}`);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      };
+
+      // Try scrolling immediately
+      scrollCard();
+      // Also schedule a retry to allow for the tab rendering delay
+      const timer = setTimeout(scrollCard, 100);
+      return () => clearTimeout(timer);
     }
-  }, [activeHighlightId]);
+  }, [activeHighlightId, activeTab]);
 
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,10 +258,157 @@ export default function Workspace() {
   const handleReferenceClick = (refItem: { type: string; id: string }) => {
     if (refItem.type === 'task') {
       navigate('/tasks');
-    } else if (refItem.type === 'obligation') {
+    } else if (
+      refItem.type === 'obligation' || 
+      refItem.type === 'paragraph' || 
+      highlights.some(h => h.id === refItem.id) || 
+      /^(o|n|m|a|e|r)_?\d+/i.test(refItem.id)
+    ) {
       scrollToHighlight(refItem.id);
     } else {
+      // Fallback in case it's not a highlight
       alert(`Referenced document ID: ${refItem.id}`);
+    }
+  };
+
+  const renderMessageTextWithLinks = (text: string) => {
+    const regex = /(\b[onmaer]_?\d+\b|\[[onmaer]_?\d+\])/ig;
+    const parts = text.split(regex);
+    
+    if (parts.length === 1) {
+      return text;
+    }
+
+    return parts.map((part, i) => {
+      if (regex.test(part)) {
+        const id = part.replace(/[\[\]]/g, '');
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => scrollToHighlight(id)}
+            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 mx-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-750 font-bold font-mono rounded border border-indigo-200 text-[10px] align-middle transition-colors uppercase"
+            title={`Scroll to highlight ${id}`}
+          >
+            <Bookmark className="h-2.5 w-2.5" />
+            {id}
+          </button>
+        );
+      }
+      return part;
+    });
+  };
+
+  const getObligationForRef = (refId: string) => {
+    return obligationsList.find(o => o.obligationId === refId);
+  };
+
+  const findMatchingPolicy = (hlTitle: string, dept?: Department) => {
+    if (!baselineData || !baselineData.activePolicies) return null;
+    
+    // 1. Try to find by title similarity
+    const titleMatch = baselineData.activePolicies.find(p => {
+      if (!p.title || !hlTitle) return false;
+      const pt = p.title.toLowerCase();
+      const ht = hlTitle.toLowerCase();
+      return pt.includes(ht) || ht.includes(pt);
+    });
+    if (titleMatch) return titleMatch;
+
+    // 2. Try to find by department
+    if (dept) {
+      const deptMatch = baselineData.activePolicies.find(p => {
+        return p.department && p.department.toLowerCase() === dept.toLowerCase();
+      });
+      if (deptMatch) return deptMatch;
+    }
+
+    return null;
+  };
+
+  const handleToggleDraft = (hlId: string, initialText: string) => {
+    setDraftingStates(prev => {
+      const isDrafting = !prev[hlId];
+      if (isDrafting && draftTexts[hlId] === undefined) {
+        setDraftTexts(t => ({ ...t, [hlId]: initialText }));
+      }
+      return { ...prev, [hlId]: isDrafting };
+    });
+  };
+
+  const handleTextChange = (hlId: string, val: string) => {
+    setDraftTexts(prev => ({ ...prev, [hlId]: val }));
+  };
+
+  const handleSavePolicy = async (hlId: string, obligationTitle: string, obligationDept?: Department) => {
+    try {
+      const draftText = draftTexts[hlId] || '';
+      if (!draftText.trim()) {
+        alert('Please enter policy text before saving.');
+        return;
+      }
+
+      const baselineDocRef = doc(db, 'companies/soubh-securities/baseline/current');
+      const docSnap = await getDoc(baselineDocRef);
+      
+      let currentBaseline: CompanyBaseline | null = null;
+      if (docSnap.exists()) {
+        currentBaseline = docSnap.data() as CompanyBaseline;
+      }
+
+      if (!currentBaseline) {
+        alert('SOUBH baseline document not found. Unable to save.');
+        return;
+      }
+
+      const activePolicies = [...(currentBaseline.activePolicies || [])];
+      
+      // Use the same matching logic to identify if a policy already exists
+      let matchingPolicyIndex = activePolicies.findIndex(p => {
+        if (!p.title || !obligationTitle) return false;
+        const pt = p.title.toLowerCase();
+        const ot = obligationTitle.toLowerCase();
+        return pt.includes(ot) || ot.includes(pt);
+      });
+
+      if (matchingPolicyIndex === -1 && obligationDept) {
+        matchingPolicyIndex = activePolicies.findIndex(p => {
+          return p.department && p.department.toLowerCase() === obligationDept.toLowerCase();
+        });
+      }
+
+      const nowIso = new Date().toISOString();
+
+      if (matchingPolicyIndex !== -1) {
+        // Update existing policy
+        const existingPolicy = activePolicies[matchingPolicyIndex];
+        activePolicies[matchingPolicyIndex] = {
+          ...existingPolicy,
+          description: draftText,
+          lastUpdated: nowIso
+        };
+      } else {
+        // Create new policy
+        const newPolicy = {
+          policyId: `pol-${Date.now()}`,
+          title: obligationTitle,
+          description: draftText,
+          department: obligationDept || 'Compliance',
+          lastUpdated: nowIso
+        };
+        activePolicies.push(newPolicy);
+      }
+
+      await updateDoc(baselineDocRef, {
+        activePolicies: activePolicies
+      });
+
+      alert('Policy successfully saved to SOUBH Baseline!');
+      setDraftingStates(prev => ({ ...prev, [hlId]: false }));
+
+    } catch (error: any) {
+      console.error('Error saving baseline policy:', error);
+      alert(`Failed to save policy: ${error.message}`);
     }
   };
 
@@ -391,17 +573,22 @@ export default function Workspace() {
               ) : (
                 highlightsList.map((hl) => {
                   const isActive = activeHighlightId === hl.id;
+                  const ob = getObligationForRef(hl.id);
+                  const matchingPolicy = findMatchingPolicy(hl.title, ob?.department);
+                  const isGap = hl.color !== 'green';
+
                   return (
                     <div
                       key={hl.id}
+                      id={`obligation-card-${hl.id}`}
                       onClick={() => scrollToHighlight(hl.id)}
-                      className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-150 relative ${
+                      className={`p-4 rounded-2xl border text-left cursor-pointer transition-all duration-150 relative ${
                         isActive 
                           ? 'border-indigo-500 bg-white ring-1 ring-indigo-500/20 shadow-md' 
                           : 'border-slate-200 bg-white hover:border-slate-350 shadow-sm'
                       }`}
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mb-3">
                         <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
                           hl.color === 'green' 
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
@@ -415,19 +602,85 @@ export default function Workspace() {
                         </span>
                         <span className="text-[10px] text-slate-400 font-mono font-medium">Page {hl.page}</span>
                       </div>
-                      <p className="text-xs font-bold text-slate-750 mt-2 leading-relaxed">
-                        {hl.title}
-                      </p>
-                      
-                      {isActive ? (
-                        <div className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-650 leading-normal animate-fadeIn space-y-1.5">
-                          <div className="flex items-start gap-1 bg-slate-50 p-2.5 rounded-xl border border-slate-150">
-                            <CornerDownRight className="h-3.5 w-3.5 text-indigo-500 shrink-0 mt-0.5" />
-                            <p className="font-sans font-semibold">{hl.reason}</p>
-                          </div>
+
+                      {/* Side-by-side gap comparison */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        {/* Left: SEBI Circular requirement */}
+                        <div className="space-y-2 border-r border-slate-100 pr-2">
+                          <h5 className="font-bold text-[10px] uppercase text-slate-450 tracking-wider">SEBI Circular Obligation</h5>
+                          <p className="font-bold text-slate-800 leading-relaxed">
+                            {hl.title}
+                          </p>
+                          <p className="text-slate-600 leading-relaxed font-sans font-medium">
+                            {hl.reason}
+                          </p>
+                          {ob?.department && (
+                            <span className="inline-block mt-1 text-[9px] font-bold bg-slate-100 text-slate-650 px-1.5 py-0.5 rounded">
+                              Dept: {ob.department}
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-[11px] text-slate-450 mt-1 line-clamp-1 truncate">{hl.reason}</p>
+
+                        {/* Right: SOUBH Matching Policy */}
+                        <div className="space-y-2">
+                          <h5 className="font-bold text-[10px] uppercase text-slate-450 tracking-wider">SOUBH Baseline Policy</h5>
+                          {matchingPolicy ? (
+                            <div className="bg-indigo-50/40 p-2.5 rounded-xl border border-indigo-100/50 space-y-1.5 flex flex-col justify-between h-full">
+                              <div>
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <span className="font-bold text-indigo-950 truncate max-w-[70%]">{matchingPolicy.title}</span>
+                                  <span className="text-[9px] bg-indigo-100 text-indigo-700 font-extrabold px-1.5 py-0.5 rounded uppercase shrink-0">{matchingPolicy.department}</span>
+                                </div>
+                                <p className="text-slate-700 font-medium font-sans leading-relaxed text-[11px] whitespace-pre-wrap">
+                                  {matchingPolicy.description}
+                                </p>
+                              </div>
+                              <div className="text-[9px] text-slate-450 italic pt-1 border-t border-indigo-100/20 mt-2">
+                                Last Updated: {new Date(matchingPolicy.lastUpdated).toLocaleDateString()}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-slate-50/50 p-2.5 rounded-xl border border-dashed border-slate-200 text-slate-450 italic flex items-center justify-center min-h-[80px] h-full text-center">
+                              No active baseline policy found
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Expandable Draft Editor & Toggle */}
+                      {isActive && isGap && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 space-y-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-between">
+                            <button
+                              onClick={() => handleToggleDraft(hl.id, matchingPolicy?.description || '')}
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-colors border border-slate-200 flex items-center gap-1.5"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              {draftingStates[hl.id] ? 'Cancel Edit' : 'Draft Policy Correction'}
+                            </button>
+                          </div>
+
+                          {draftingStates[hl.id] && (
+                            <div className="space-y-3 animate-fadeIn">
+                              <textarea
+                                value={draftTexts[hl.id] || ''}
+                                onChange={(e) => handleTextChange(hl.id, e.target.value)}
+                                placeholder="Draft the internal policy details..."
+                                rows={4}
+                                className="w-full text-xs font-sans font-medium border border-slate-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 hover:bg-slate-100/50 focus:bg-white transition-all resize-y"
+                              />
+                              <div className="flex justify-end">
+                                <button
+                                  onClick={() => handleSavePolicy(hl.id, hl.title, ob?.department)}
+                                  className="px-4 py-2 bg-indigo-650 hover:bg-indigo-750 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-650/10 flex items-center gap-1.5"
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  Save Policy to SOUBH Baseline
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -449,7 +702,9 @@ export default function Workspace() {
                         ? 'bg-indigo-650 text-white rounded-tr-none shadow-sm shadow-indigo-600/10' 
                         : 'bg-white text-slate-750 border border-slate-200 shadow-sm rounded-tl-none font-medium'
                     }`}>
-                      <p className="whitespace-pre-line font-sans">{msg.text}</p>
+                      <p className="whitespace-pre-line font-sans">
+                        {renderMessageTextWithLinks(msg.text)}
+                      </p>
                       
                       {/* Render citation references */}
                       {msg.references && msg.references.length > 0 && (

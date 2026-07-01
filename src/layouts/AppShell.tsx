@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useRoleStore, UserRole } from '../context/useRoleStore';
 import { seedDatabase } from '../utils/seedDatabase';
+import { seedCompanyBaselinePreset } from '../services/workflowManager';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -26,11 +27,12 @@ export default function AppShell({ children }: AppShellProps) {
   const location = useLocation();
   const { role, setRole } = useRoleStore();
   const [isSeeding, setIsSeeding] = React.useState(false);
+  const [selectedPreset, setSelectedPreset] = React.useState<'stockbroker' | 'mutual_fund_amc' | 'investment_advisor'>('stockbroker');
 
   const handleSeed = async () => {
     setIsSeeding(true);
     try {
-      const res = await seedDatabase();
+      const res = await seedCompanyBaselinePreset(selectedPreset);
       alert(res.message);
     } catch (err: any) {
       alert('Seeding failed: ' + err.message);
@@ -174,15 +176,27 @@ export default function AppShell({ children }: AppShellProps) {
             </div>
 
             {/* Seed baseline database */}
-            <button 
-              onClick={handleSeed}
-              disabled={isSeeding}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 disabled:opacity-50 border border-indigo-200 text-xs font-bold rounded-xl transition-all duration-150"
-              title="Reset Demo Database"
-            >
-              <Database className="h-3.5 w-3.5" />
-              <span>{isSeeding ? 'Seeding...' : 'Seed Baseline'}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <select
+                value={selectedPreset}
+                onChange={(e) => setSelectedPreset(e.target.value as any)}
+                disabled={isSeeding}
+                className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="stockbroker">Stockbroker</option>
+                <option value="mutual_fund_amc">Mutual Fund AMC</option>
+                <option value="investment_advisor">Investment Advisor</option>
+              </select>
+              <button 
+                onClick={handleSeed}
+                disabled={isSeeding}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 disabled:opacity-50 border border-indigo-200 text-xs font-bold rounded-xl transition-all duration-150"
+                title="Seed Selected Preset Baseline"
+              >
+                <Database className="h-3.5 w-3.5" />
+                <span>{isSeeding ? 'Seeding...' : 'Seed'}</span>
+              </button>
+            </div>
 
             {/* Notifications */}
             <button className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors relative">
